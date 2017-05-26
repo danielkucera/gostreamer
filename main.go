@@ -1,10 +1,18 @@
 package main
 
-import "github.com/gin-gonic/gin"
-import "encoding/base64"
+import (
+	"github.com/gin-gonic/gin"
+	"encoding/base64"
+	"os/exec"
+	"io"
+	"log"
+)
 
 type Stream struct {
 	Url	string
+	Cmd	*exec.Cmd
+	Stderr	string
+	Stdout	io.ReadCloser
 }
 
 type Server struct {
@@ -12,10 +20,46 @@ type Server struct {
 }
 
 func (s *Server) createStream(Url string) *Stream {
+	cmd := exec.Command("ffmpeg", "-i", Url, "-f mpegts -")
+
 	strm := &Stream {
 		Url: Url,
+		Cmd: cmd,
 	}
 	s.Streams[Url] = strm
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Printf("%s", err)
+		return nil
+	}
+	strm.Stdout = stdout
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		log.Printf("%s", err)
+		return nil
+	}
+
+	buf := make([]byte, 1024)
+	done := make(chan bool)
+
+	go func() {
+		var err error
+		var lng int
+		for err == nil {
+			lng, err = stderr.Read(buf)
+			strm.Stderr = strm.Stderr + string(buf)[0:lng]
+		}
+		done <- true
+	}()
+
+	err = cmd.Start();
+	if err != nil {
+		log.Printf("%s", err)
+		return nil
+	}
+
 	return strm
 }
 
