@@ -180,6 +180,14 @@ func main() {
 		}
 	})
 
+	router.GET("/list/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		m3u := "#EXTM3U\n"
+		m3u = m3u + "#EXTINF:-1,TV\n"
+		m3u = m3u + "http://" + c.Request.Host + "/stream/" + id + "\n"
+		c.Data(200, "audio/mpegurl", []byte(m3u))
+	})
+
 	router.GET("/status", func(c *gin.Context) {
 		c.JSON(200, server)
 	})
@@ -188,7 +196,10 @@ func main() {
 		page := ""
 		for key, val := range server.Sources {
 			id := base64.StdEncoding.EncodeToString([]byte(val))
-			page = page + "<a href='/stream/"+ id +"'>" + key + "</a><br>\n"
+			page = page + key
+			page = page + "<a href='/stream/"+ id +"'>stream</a>"
+			page = page + "<a href='/list/"+ id +"'>list</a>\n"
+			page = page + "<br>\n"
 		}
 		c.Data(200, "text/html", []byte(page))
 	})
