@@ -3,8 +3,10 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"encoding/base64"
+	"encoding/csv"
 	"os/exec"
 	"io"
+	"os"
 	"log"
 )
 
@@ -17,10 +19,11 @@ type Stream struct {
 
 type Server struct {
 	Streams map[string]*Stream
+	Sources map[string]string
 }
 
 func (s *Server) createStream(Url string) *Stream {
-	cmd := exec.Command("ffmpeg", "-i", Url, "-f mpegts -")
+	cmd := exec.Command("ffmpeg", "-i", Url, "-f", "mpegts", "-")
 
 	strm := &Stream {
 		Url: Url,
@@ -71,12 +74,39 @@ func (s *Server) getStream(Url string) *Stream {
 	}
 }
 
+func load_sources_csv(file string, server *Server){
+	f, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+
+	r := csv.NewReader(f)
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if len(record) > 1 {
+			server.Sources[record[0]] = record[1]
+		}
+
+	}
+}
 
 func main() {
 	router := gin.Default()
+
 	server := Server{
 		Streams: make(map[string]*Stream, 0),
+		Sources: make(map[string]string, 0),
 	}
+
+	load_sources_csv("sources.csv", &server)
 
 	// This handler will match /user/john but will not match neither /user/ or /user
 	router.GET("/stream/:id", func(c *gin.Context) {
@@ -98,6 +128,15 @@ func main() {
 	// If no other routers match /user/john, it will redirect to /user/john/
 	router.GET("/status", func(c *gin.Context) {
 		c.JSON(200, server)
+	})
+
+	router.GET("/", func(c *gin.Context) {
+		page := ""
+		for key, val := range server.Sources {
+			id := base64.StdEncoding.EncodeToString([]byte(val))
+			page = page + "<a href='/stream/"+ id +"'>" + key + "</a><br>\n"
+		}
+		c.Data(200, "text/html", []byte(page))
 	})
 
 	router.Run(":8080")
