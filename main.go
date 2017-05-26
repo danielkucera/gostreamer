@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"os/exec"
+	"bufio"
 	"io"
 	"os"
 	"log"
@@ -15,6 +16,8 @@ type Stream struct {
 	Cmd	*exec.Cmd
 	Stderr	string
 	Stdout	io.ReadCloser
+	Clients map[*bufio.ReadWriter]bool `json:"-"`
+//	Clients []*gin.Context `json:"-"`
 }
 
 type Server struct {
@@ -28,6 +31,7 @@ func (s *Server) createStream(Url string) *Stream {
 	strm := &Stream {
 		Url: Url,
 		Cmd: cmd,
+		Clients: make(map[*bufio.ReadWriter]bool, 0),
 	}
 	s.Streams[Url] = strm
 
@@ -44,15 +48,34 @@ func (s *Server) createStream(Url string) *Stream {
 		return nil
 	}
 
-	buf := make([]byte, 1024)
 	done := make(chan bool)
 
 	go func() {
+		buf := make([]byte, 1024)
 		var err error
 		var lng int
 		for err == nil {
 			lng, err = stderr.Read(buf)
 			strm.Stderr = strm.Stderr + string(buf)[0:lng]
+		}
+		done <- true
+	}()
+
+	go func() {
+		buf := make([]byte, 1024)
+		var rerr error
+		var lng int
+		for rerr == nil {
+			lng, rerr = stdout.Read(buf)
+//			log.Printf("stdout read")
+			for client, _ := range strm.Clients {
+//				log.Printf("client write")
+				_, err := client.Writer.Write(buf[0:lng])
+				if err != nil {
+					log.Printf("error writing to client: %s", err)
+					delete(strm.Clients, client)
+				}
+			}
 		}
 		done <- true
 	}()
@@ -72,6 +95,18 @@ func (s *Server) getStream(Url string) *Stream {
 	} else {
 		return s.createStream(Url)
 	}
+}
+
+func (s *Stream) addClient(c *gin.Context) {
+//	c.Data(200, "applicatiom/octet-stream", []byte("\n"))
+//	c.Header("Content-Type", "application/octet-stream")
+	headers := `HTTP/1.1 200 OK
+Content-Type: applicatiom/octet-stream
+
+`
+	_, rw, _ := c.Writer.Hijack()
+	rw.Writer.Write([]byte(headers))
+	s.Clients[rw] = true
 }
 
 func load_sources_csv(file string, server *Server){
@@ -108,7 +143,6 @@ func main() {
 
 	load_sources_csv("sources.csv", &server)
 
-	// This handler will match /user/john but will not match neither /user/ or /user
 	router.GET("/stream/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		Url, err := base64.StdEncoding.DecodeString(id)
@@ -121,11 +155,10 @@ func main() {
 		if strm == nil {
 			c.String(200, "Unable to start stream %s", Url)
 		} else {
+			strm.addClient(c)
 		}
 	})
 
-	// However, this one will match /user/john/ and also /user/john/send
-	// If no other routers match /user/john, it will redirect to /user/john/
 	router.GET("/status", func(c *gin.Context) {
 		c.JSON(200, server)
 	})
