@@ -9,11 +9,13 @@ import (
 	"io"
 	"os"
 	"log"
+	"time"
 )
 
 type Stream struct {
 	Url	string
 	Cmd	*exec.Cmd
+	LastWrite time.Time
 	Stderr	string
 	Stdout	io.ReadCloser
 	Clients map[*bufio.ReadWriter]bool `json:"-"`
@@ -34,6 +36,8 @@ func (s *Server) createStream(Url string) *Stream {
 		Clients: make(map[*bufio.ReadWriter]bool, 0),
 	}
 	s.Streams[Url] = strm
+
+	log.Printf("starting stream %s", strm.Url)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -69,6 +73,7 @@ func (s *Server) createStream(Url string) *Stream {
 			lng, rerr = stdout.Read(buf)
 //			log.Printf("stdout read")
 			for client, _ := range strm.Clients {
+				strm.LastWrite = time.Now()
 //				log.Printf("client write")
 				_, err := client.Writer.Write(buf[0:lng])
 				if err != nil {
@@ -76,7 +81,12 @@ func (s *Server) createStream(Url string) *Stream {
 					delete(strm.Clients, client)
 				}
 			}
+			if time.Since(strm.LastWrite) > 30*time.Second {
+				log.Printf("no client on stream %s", strm.Url)
+				break
+			}
 		}
+		server.stopStream(strm.Url)
 		done <- true
 	}()
 
@@ -94,6 +104,15 @@ func (s *Server) getStream(Url string) *Stream {
 		return val;
 	} else {
 		return s.createStream(Url)
+	}
+}
+
+func (s *Server) stopStream(Url string) {
+	log.Printf("stopping stream %s", Url)
+	if val, ok := s.Streams[Url]; ok {
+		delete(s.Streams, Url)
+		val.Cmd.Process.Kill()
+		//TODO: kill clients
 	}
 }
 
@@ -133,10 +152,12 @@ func load_sources_csv(file string, server *Server){
 	}
 }
 
+var server Server
+
 func main() {
 	router := gin.Default()
 
-	server := Server{
+	server = Server{
 		Streams: make(map[string]*Stream, 0),
 		Sources: make(map[string]string, 0),
 	}
