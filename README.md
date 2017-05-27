@@ -15,4 +15,4 @@ Other stream,http://server/file.mp4
 * open interface in browser http://server:8080/
 
 ## Screenshot
-(doc/screenshot.png)
+![screen](doc/screenshot.png)
