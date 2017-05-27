@@ -16,10 +16,10 @@
     <md-list-item ng-repeat="stream in sources | filter: searchFilter" class="noright">
       <md-icon md-font-icon="av" aria-label="Stream URL">movie</md-icon>
       <p>{{ stream.Name }}</p>
-      <a href="/player/{{ stream.Id }}"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
-      <a href="/hls/{{ stream.Id }}"><md-icon md-font-icon="av" aria-label="Play in Android">android</md-icon></a>
-      <a href="/stream/{{ stream.Id }}"><md-icon md-font-icon="content" aria-label="Stream URL">link</md-icon></a>
-      <a href="/list/{{ stream.Id }}"><md-icon md-font-icon="av" aria-label="Play in playlist">playlist_play</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/player.html"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/hls.m3u8"><md-icon md-font-icon="av" aria-label="Play in Android">android</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/stream.ts"><md-icon md-font-icon="content" aria-label="Stream URL">link</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/list.m3u"><md-icon md-font-icon="av" aria-label="Play in playlist">playlist_play</md-icon></a>
     </md-list-item>
   </md-list>
   

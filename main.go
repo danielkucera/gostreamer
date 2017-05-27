@@ -70,8 +70,7 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_base_url", "/data/",
 		"-hls_segment_filename", "data/stream-"+id+"-%Y%m%d-%s.ts",
 		"-f", "hls",
-		"-method", "PUT", "http://localhost:8080/hls/"+id,
-//		"data/abcd.m3u8",
+		"-method", "PUT", "http://localhost:8080/stream/"+id+"/hls.m3u8",
 	)
 
 	strm.Cmd = cmd
@@ -225,61 +224,58 @@ func main() {
 	router.Static("/static", "./static")
 	router.Static("/data", "./data")
 
-	router.GET("/player/:id", func(c *gin.Context) {
+
+	stream := router.Group("/stream/:id", func(c *gin.Context) {
+		id := c.Param("id")
+
+		strm := server.getStream(id)
+		if strm == nil {
+			c.String(500, "Unable to start stream %s", id)
+			c.Abort()
+		} else {
+			c.Set("stream", strm)
+		}
+	})
+
+	stream.GET("player.html", func(c *gin.Context) {
 		id := c.Param("id")
 		c.HTML(200, "player.tmpl", gin.H{
 			"id": id,
 		})
 	})
 
-	router.GET("/stream/:id", func(c *gin.Context) {
-		id := c.Param("id")
-
-		strm := server.getStream(id)
-		if strm == nil {
-			c.String(200, "Unable to start stream %s", id)
-		} else {
-			strm.serveClient(c)
-		}
+	stream.GET("stream.ts", func(c *gin.Context) {
+		strm := c.MustGet("stream").(*Stream)
+		strm.serveClient(c)
 	})
 
-	router.GET("/hls/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	stream.GET("hls.m3u8", func(c *gin.Context) {
+		strm := c.MustGet("stream").(*Stream)
 
-		strm := server.getStream(id)
 		strm.updateRead()
-		if strm == nil {
-			c.String(200, "Unable to start stream %s", id)
-		} else {
-			for strm.Playlist == "" {
-				time.Sleep(time.Second)
-			}
-			c.Data(200, "application/x-mpegURL", []byte(strm.Playlist))
+		for strm.Playlist == "" {
+			time.Sleep(time.Second)
 		}
+		c.Data(200, "application/x-mpegURL", []byte(strm.Playlist))
 	})
 
-	router.PUT("/hls/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	stream.PUT("hls.m3u8", func(c *gin.Context) {
+		strm := c.MustGet("stream").(*Stream)
 		bodyR := c.Request.Body
 		body, _ := ioutil.ReadAll(bodyR)
 		sbody := string(body)
 
-		strm := server.getStream(id)
-		if strm == nil {
-			c.String(200, "Unable to start stream %s", id)
-		} else {
-			strm.Playlist = sbody
-			lines := strings.Split(sbody, "\n")
-			strm.LastChunk = lines[len(lines)-2]
-		}
+		strm.Playlist = sbody
+		lines := strings.Split(sbody, "\n")
+		strm.LastChunk = lines[len(lines)-2]
 	})
 
 
-	router.GET("/list/:id", func(c *gin.Context) {
+	stream.GET("list.m3u", func(c *gin.Context) {
 		id := c.Param("id")
 		m3u := "#EXTM3U\n"
 		m3u = m3u + "#EXTINF:-1,TV\n"
-		m3u = m3u + "http://" + c.Request.Host + "/stream/" + id + "\n"
+		m3u = m3u + "http://" + c.Request.Host + "/stream/" + id + "/stream.ts\n"
 		c.Data(200, "audio/mpegurl", []byte(m3u))
 	})
 
