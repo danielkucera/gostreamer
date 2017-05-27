@@ -209,6 +209,7 @@ func SetHeaders(c *gin.Context) {
 func main() {
 	router := gin.Default()
 	router.Use(SetHeaders)
+	router.LoadHTMLGlob("templates/*")
 
 	server = Server{
 		Streams: make(map[string]*Stream, 0),
@@ -223,6 +224,13 @@ func main() {
 
 	router.Static("/static", "./static")
 	router.Static("/data", "./data")
+
+	router.GET("/player/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		c.HTML(200, "player.tmpl", gin.H{
+			"id": id,
+		})
+	})
 
 	router.GET("/stream/:id", func(c *gin.Context) {
 		id := c.Param("id")
