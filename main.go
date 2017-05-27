@@ -22,9 +22,15 @@ type Stream struct {
 //	Clients []*gin.Context `json:"-"`
 }
 
+type Source struct {
+	Name	string
+	Url	string
+	UrlEncoded	string
+}
+
 type Server struct {
 	Streams map[string]*Stream
-	Sources map[string]string
+	Sources []*Source
 }
 
 func (s *Server) createStream(Url string) *Stream {
@@ -146,7 +152,12 @@ func load_sources_csv(file string, server *Server){
 		}
 
 		if len(record) > 1 {
-			server.Sources[record[0]] = record[1]
+			src := Source {
+				Name: record[0],
+				Url: record[1],
+				UrlEncoded: base64.StdEncoding.EncodeToString([]byte(record[1])),
+			}
+			server.Sources = append(server.Sources, &src)
 		}
 
 	}
@@ -159,10 +170,16 @@ func main() {
 
 	server = Server{
 		Streams: make(map[string]*Stream, 0),
-		Sources: make(map[string]string, 0),
+		Sources: make([]*Source, 0),
 	}
 
 	load_sources_csv("sources.csv", &server)
+
+	router.GET("/", func(c *gin.Context) {
+		c.Redirect(307, "/static/list.html")
+	})
+
+	router.Static("/static", "./static")
 
 	router.GET("/stream/:id", func(c *gin.Context) {
 		id := c.Param("id")
@@ -192,16 +209,8 @@ func main() {
 		c.JSON(200, server)
 	})
 
-	router.GET("/", func(c *gin.Context) {
-		page := ""
-		for key, val := range server.Sources {
-			id := base64.StdEncoding.EncodeToString([]byte(val))
-			page = page + key
-			page = page + "<a href='/stream/"+ id +"'>stream</a>"
-			page = page + "<a href='/list/"+ id +"'>list</a>\n"
-			page = page + "<br>\n"
-		}
-		c.Data(200, "text/html", []byte(page))
+	router.GET("/sources", func(c *gin.Context) {
+		c.JSON(200, server.Sources)
 	})
 
 	router.Run(":8080")

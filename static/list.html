@@ -1,0 +1,67 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Angular Material style sheet -->
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.css">
+
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body ng-app="listStreams" ng-cloak>
+  <md-list ng-controller="ListCtrl" ng-cloak>
+    <md-input-container class="md-block" flex>
+      <label>Search</label>
+      <input type="text" ng-model="searchFilter">
+    </md-input-container>
+    <md-subheader class="md-no-sticky">Stream List</md-subheader>
+    <md-list-item ng-repeat="stream in sources | filter: searchFilter" class="noright">
+      <md-icon md-font-icon="av" aria-label="Stream URL">movie</md-icon>
+      <p>{{ stream.Name }}</p>
+      <a href="/stream/{{ stream.UrlEncoded }}"><md-icon md-font-icon="content" aria-label="Stream URL">link</md-icon></a>
+      <a href="/list/{{ stream.UrlEncoded }}"><md-icon md-font-icon="av" aria-label="Play in playlist">playlist_play</md-icon></a>
+    </md-list-item>
+  </md-list>
+  
+  <!-- Angular Material requires Angular.js Libraries -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+
+  <!-- Angular Material Library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+  
+<script>
+angular.module('listStreams', ['ngMaterial'])
+.controller('ListCtrl', function($scope, $http) {
+
+  $http.get("/sources").then(function(response) {
+    $scope.sources = angular.fromJson(response.data);
+  });
+
+});
+</script>
+
+<style>
+.listdemoListControls md-divider {
+  margin-top: 0;
+  margin-bottom: 0; }
+
+.listdemoListControls md-list {
+  padding-top: 0; }
+
+.listdemoListControls md-list-item > p,
+.listdemoListControls md-list-item > .md-list-item-inner > p,
+.listdemoListControls md-list-item .md-list-item-inner > p,
+.listdemoListControls md-list-item .md-list-item-inner > .md-list-item-inner > p {
+  -webkit-user-select: none;
+  /* Chrome all / Safari all */
+  -moz-user-select: none;
+  /* Firefox all */
+  -ms-user-select: none;
+  /* IE 10+ */
+  user-select: none;
+  /* Likely future */ }
+
+
+</style>
+</html>
