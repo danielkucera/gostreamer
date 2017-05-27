@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"encoding/base64"
 	"encoding/csv"
+	"strconv"
 	"os/exec"
 	"bufio"
 	"io"
@@ -13,6 +14,7 @@ import (
 )
 
 type Stream struct {
+	Id	string
 	Url	string
 	Active	bool
 	Cmd	*exec.Cmd
@@ -24,6 +26,7 @@ type Stream struct {
 }
 
 type Source struct {
+	Id	int
 	Name	string
 	Url	string
 	UrlEncoded	string
@@ -34,10 +37,21 @@ type Server struct {
 	Sources []*Source
 }
 
-func (s *Server) createStream(Url string) *Stream {
+func (s *Server) createStream(id string) *Stream {
+
+	iid, _ := strconv.Atoi(id)
+
+	strm := &Stream {
+		Id: id,
+		Url: server.Sources[iid].Url,
+		Active: true,
+		Clients: make(map[*bufio.ReadWriter]bool, 0),
+	}
+	s.Streams[id] = strm
+
 	cmd := exec.Command(
 		"./ffmpeg",
-		"-i", Url,
+		"-i", strm.Url,
 		"-map", "0",
 		"-copy_unknown",
 		"-sn", //subtitle none
@@ -51,13 +65,7 @@ func (s *Server) createStream(Url string) *Stream {
 		"-f", "mpegts", "-",
 	)
 
-	strm := &Stream {
-		Url: Url,
-		Active: true,
-		Cmd: cmd,
-		Clients: make(map[*bufio.ReadWriter]bool, 0),
-	}
-	s.Streams[Url] = strm
+	strm.Cmd = cmd
 
 	log.Printf("starting stream %s", strm.Url)
 
@@ -122,17 +130,17 @@ func (s *Server) createStream(Url string) *Stream {
 	return strm
 }
 
-func (s *Server) getStream(Url string) *Stream {
-	if val, ok := s.Streams[Url]; ok && val.Active {
+func (s *Server) getStream(id string) *Stream {
+	if val, ok := s.Streams[id]; ok && val.Active {
 		return val;
 	} else {
-		return s.createStream(Url)
+		return s.createStream(id)
 	}
 }
 
-func (s *Server) stopStream(Url string) {
-	log.Printf("stopping stream %s", Url)
-	if val, ok := s.Streams[Url]; ok {
+func (s *Server) stopStream(id string) {
+	log.Printf("stopping stream %s", id)
+	if val, ok := s.Streams[id]; ok {
 		val.Active = false
 		val.Cmd.Process.Kill()
 		//TODO: kill clients
@@ -158,6 +166,7 @@ func load_sources_csv(file string, server *Server){
 	}
 
 	r := csv.NewReader(f)
+	i := 0
 
 	for {
 		record, err := r.Read()
@@ -170,11 +179,13 @@ func load_sources_csv(file string, server *Server){
 
 		if len(record) > 1 {
 			src := Source {
+				Id: i,
 				Name: record[0],
 				Url: record[1],
 				UrlEncoded: base64.StdEncoding.EncodeToString([]byte(record[1])),
 			}
 			server.Sources = append(server.Sources, &src)
+			i = i + 1
 		}
 
 	}
@@ -200,15 +211,10 @@ func main() {
 
 	router.GET("/stream/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		Url, err := base64.StdEncoding.DecodeString(id)
-		if err != nil {
-			c.String(500, "Unable to decode stream id %s", id)
-			return
-		}
 
-		strm := server.getStream(string(Url))
+		strm := server.getStream(id)
 		if strm == nil {
-			c.String(200, "Unable to start stream %s", Url)
+			c.String(200, "Unable to start stream %s", id)
 		} else {
 			strm.addClient(c)
 		}
