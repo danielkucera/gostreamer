@@ -14,6 +14,7 @@ import (
 
 type Stream struct {
 	Url	string
+	Active	bool
 	Cmd	*exec.Cmd
 	LastWrite time.Time
 	Stderr	string
@@ -34,10 +35,25 @@ type Server struct {
 }
 
 func (s *Server) createStream(Url string) *Stream {
-	cmd := exec.Command("ffmpeg", "-i", Url, "-f", "mpegts", "-")
+	cmd := exec.Command(
+		"./ffmpeg",
+		"-i", Url,
+		"-map", "0",
+		"-copy_unknown",
+		"-sn", //subtitle none
+		"-dn", //data none
+		"-deinterlace",
+		"-c:v", "h264",
+		"-preset", "fast",
+		"-b:v", "1024k",
+		"-c:a", "aac",
+		"-b:a", "192k",
+		"-f", "mpegts", "-",
+	)
 
 	strm := &Stream {
 		Url: Url,
+		Active: true,
 		Cmd: cmd,
 		Clients: make(map[*bufio.ReadWriter]bool, 0),
 	}
@@ -92,6 +108,7 @@ func (s *Server) createStream(Url string) *Stream {
 				break
 			}
 		}
+		log.Printf("stdout read error %s", rerr)
 		server.stopStream(strm.Url)
 		done <- true
 	}()
@@ -106,7 +123,7 @@ func (s *Server) createStream(Url string) *Stream {
 }
 
 func (s *Server) getStream(Url string) *Stream {
-	if val, ok := s.Streams[Url]; ok {
+	if val, ok := s.Streams[Url]; ok && val.Active {
 		return val;
 	} else {
 		return s.createStream(Url)
@@ -116,7 +133,7 @@ func (s *Server) getStream(Url string) *Stream {
 func (s *Server) stopStream(Url string) {
 	log.Printf("stopping stream %s", Url)
 	if val, ok := s.Streams[Url]; ok {
-		delete(s.Streams, Url)
+		val.Active = false
 		val.Cmd.Process.Kill()
 		//TODO: kill clients
 	}
