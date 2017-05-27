@@ -14,5 +14,13 @@ Other stream,http://server/file.mp4
 * ```./gostreamer```
 * open interface in browser http://server:8080/
 
+## Install as service
+```
+ln -s /opt/gostream/gostream.service /etc/systemd/system/gostream.service
+systemctl daemon-reload
+systemctl enable gostream
+systemctl start gostream
+```
+
 ## Screenshot
 ![screen](doc/screenshot.png)
