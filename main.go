@@ -62,7 +62,14 @@ func (s *Server) createStream(id string) *Stream {
 		"-b:v", "1024k",
 		"-c:a", "aac",
 		"-b:a", "192k",
-		"-f", "mpegts", "-",
+		"-start_number", "0",
+		"-hls_time", "3",
+		"-hls_list_size", "10",
+		"-use_localtime", "1",
+		"-hls_segment_filename", "data/file-%Y%m%d-%s.ts",
+		"-f", "hls",
+		"-method", "PUT", "http://localhost:8080/live/out.m3u8",
+//		"data/abcd.m3u8",
 	)
 
 	strm.Cmd = cmd
@@ -208,6 +215,7 @@ func main() {
 	})
 
 	router.Static("/static", "./static")
+	router.Static("/data", "./data")
 
 	router.GET("/stream/:id", func(c *gin.Context) {
 		id := c.Param("id")
