@@ -13,3 +13,6 @@ Other stream,http://server/file.mp4
 ```
 * ```./gostreamer```
 * open interface in browser http://server:8080/
+
+## Screenshot
+(doc/screenshot.png)
