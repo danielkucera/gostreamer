@@ -70,7 +70,7 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_base_url", "/data/",
 		"-hls_segment_filename", "data/stream-"+id+"-%Y%m%d-%s.ts",
 		"-f", "hls",
-		"-method", "PUT", "http://localhost:8080/hlslist/"+id,
+		"-method", "PUT", "http://localhost:8080/hls/"+id,
 //		"data/abcd.m3u8",
 	)
 
@@ -250,7 +250,7 @@ func main() {
 		}
 	})
 
-	router.PUT("/hlslist/:id", func(c *gin.Context) {
+	router.PUT("/hls/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		bodyR := c.Request.Body
 		body, _ := ioutil.ReadAll(bodyR)
