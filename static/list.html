@@ -8,10 +8,22 @@
 </head>
 <body ng-app="listStreams" ng-cloak>
   <md-list ng-controller="ListCtrl" ng-cloak>
-    <md-input-container class="md-block" flex>
-      <label>Search</label>
-      <input type="text" ng-model="searchFilter">
-    </md-input-container>
+    <div layout="row">
+      <md-input-container class="md-block" flex>
+        <label>Search</label>
+        <input type="text" ng-model="searchFilter">
+      </md-input-container>
+      <md-select ng-model="bitrate" placeholder="Bitrate" class="md-no-underline">
+        <md-option value="2048">2Mbps</md-option>
+        <md-option selected value="1024">1Mbps</md-option>
+        <md-option value="512">512kbps</md-option>
+      </md-select>
+      <md-select ng-model="resolution" placeholder="Resolution" class="md-no-underline">
+        <md-option selected value="1080">1080p</md-option>
+        <md-option value="720">720p</md-option>
+        <md-option value="480">480p</md-option>
+      </md-select>
+    </div>
     <md-subheader class="md-no-sticky">Stream List</md-subheader>
     <md-list-item ng-repeat="stream in sources | filter: searchFilter" class="noright">
       <md-icon md-font-icon="av" aria-label="Stream URL">movie</md-icon>
