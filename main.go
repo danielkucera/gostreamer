@@ -6,9 +6,10 @@ import (
 	"encoding/csv"
 	"strconv"
 	"os/exec"
-	"bufio"
 	"io"
+	"io/ioutil"
 	"os"
+	"strings"
 	"log"
 	"time"
 )
@@ -19,10 +20,10 @@ type Stream struct {
 	Active	bool
 	Cmd	*exec.Cmd
 	LastWrite time.Time
+	Playlist string
+	LastChunk string
 	Stderr	string
 	Stdout	io.ReadCloser
-	Clients map[*bufio.ReadWriter]bool `json:"-"`
-//	Clients []*gin.Context `json:"-"`
 }
 
 type Source struct {
@@ -43,9 +44,9 @@ func (s *Server) createStream(id string) *Stream {
 
 	strm := &Stream {
 		Id: id,
+		LastWrite: time.Now(),
 		Url: server.Sources[iid].Url,
 		Active: true,
-		Clients: make(map[*bufio.ReadWriter]bool, 0),
 	}
 	s.Streams[id] = strm
 
@@ -66,22 +67,16 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_time", "3",
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
-		"-hls_segment_filename", "data/file-%Y%m%d-%s.ts",
+		"-hls_base_url", "/data/",
+		"-hls_segment_filename", "data/stream-"+id+"-%Y%m%d-%s.ts",
 		"-f", "hls",
-		"-method", "PUT", "http://localhost:8080/live/out.m3u8",
+		"-method", "PUT", "http://localhost:8080/hlslist/"+id,
 //		"data/abcd.m3u8",
 	)
 
 	strm.Cmd = cmd
 
 	log.Printf("starting stream %s", strm.Url)
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Printf("%s", err)
-		return nil
-	}
-	strm.Stdout = stdout
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -103,28 +98,11 @@ func (s *Server) createStream(id string) *Stream {
 	}()
 
 	go func() {
-		buf := make([]byte, 1024)
-		var rerr error
-		var lng int
-		for rerr == nil {
-			lng, rerr = stdout.Read(buf)
-//			log.Printf("stdout read")
-			for client, _ := range strm.Clients {
-				strm.LastWrite = time.Now()
-//				log.Printf("client write")
-				_, err := client.Writer.Write(buf[0:lng])
-				if err != nil {
-					log.Printf("error writing to client: %s", err)
-					delete(strm.Clients, client)
-				}
-			}
-			if time.Since(strm.LastWrite) > 30*time.Second {
-				log.Printf("no client on stream %s", strm.Url)
-				break
-			}
+		for time.Since(strm.LastWrite) < 30*time.Second {
+			time.Sleep(time.Second*5)
 		}
-		log.Printf("stdout read error %s", rerr)
-		server.stopStream(strm.Url)
+		log.Printf("no client on stream %s", strm.Url)
+		server.stopStream(id)
 		done <- true
 	}()
 
@@ -154,7 +132,7 @@ func (s *Server) stopStream(id string) {
 	}
 }
 
-func (s *Stream) addClient(c *gin.Context) {
+func (s *Stream) serveClient(c *gin.Context) {
 //	c.Data(200, "applicatiom/octet-stream", []byte("\n"))
 //	c.Header("Content-Type", "application/octet-stream")
 	headers := `HTTP/1.1 200 OK
@@ -163,7 +141,30 @@ Content-Type: applicatiom/octet-stream
 `
 	_, rw, _ := c.Writer.Hijack()
 	rw.Writer.Write([]byte(headers))
-	s.Clients[rw] = true
+
+	for s.LastChunk == "" {
+		time.Sleep(time.Second)
+	}
+	var err error
+	for err == nil {
+		toRead := s.LastChunk
+		f, err := os.Open("."+toRead)
+		if err != nil {
+			break
+		}
+		_, err = io.Copy(rw.Writer, f)
+		if err != nil {
+			break
+		}
+		s.updateRead()
+		for toRead == s.LastChunk {
+			time.Sleep(time.Millisecond*100)
+		}
+	}
+}
+
+func (s *Stream) updateRead() {
+	s.LastWrite = time.Now()
 }
 
 func load_sources_csv(file string, server *Server){
@@ -200,8 +201,14 @@ func load_sources_csv(file string, server *Server){
 
 var server Server
 
+func SetHeaders(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin","*")
+	c.Next()
+}
+
 func main() {
 	router := gin.Default()
+	router.Use(SetHeaders)
 
 	server = Server{
 		Streams: make(map[string]*Stream, 0),
@@ -224,9 +231,41 @@ func main() {
 		if strm == nil {
 			c.String(200, "Unable to start stream %s", id)
 		} else {
-			strm.addClient(c)
+			strm.serveClient(c)
 		}
 	})
+
+	router.GET("/hls/:id", func(c *gin.Context) {
+		id := c.Param("id")
+
+		strm := server.getStream(id)
+		strm.updateRead()
+		if strm == nil {
+			c.String(200, "Unable to start stream %s", id)
+		} else {
+			for strm.Playlist == "" {
+				time.Sleep(time.Second)
+			}
+			c.Data(200, "application/x-mpegURL", []byte(strm.Playlist))
+		}
+	})
+
+	router.PUT("/hlslist/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		bodyR := c.Request.Body
+		body, _ := ioutil.ReadAll(bodyR)
+		sbody := string(body)
+
+		strm := server.getStream(id)
+		if strm == nil {
+			c.String(200, "Unable to start stream %s", id)
+		} else {
+			strm.Playlist = sbody
+			lines := strings.Split(sbody, "\n")
+			strm.LastChunk = lines[len(lines)-2]
+		}
+	})
+
 
 	router.GET("/list/:id", func(c *gin.Context) {
 		id := c.Param("id")
