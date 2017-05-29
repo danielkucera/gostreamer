@@ -57,6 +57,37 @@ func (s *Server) getSources() []*Source {
 	return srcs
 }
 
+func (s *Server) addSource(src *Source) error {
+	log.Printf("addding %s", src.Name)
+	stmt, err := s.DB.Prepare("INSERT INTO `sources` (`name`, `url`) VALUES (?,?)")
+        if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(src.Name,src.Url)
+        if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) getSourceById(id int) *Source {
+
+        stmt, err := s.DB.Prepare("SELECT `id`,`name`,`url` FROM `sources` WHERE `id` = ?")
+        checkErr(err)
+
+	rows, err := stmt.Query(id)
+	checkErr(err)
+
+        if rows.Next() {
+            var src Source
+            err = rows.Scan(&src.Id, &src.Name, &src.Url)
+            checkErr(err)
+            return &src
+        } else {
+	    return nil
+	}
+}
+
 func (s *Server) createStream(id string) *Stream {
 
 	iid, _ := strconv.Atoi(id)
@@ -64,7 +95,7 @@ func (s *Server) createStream(id string) *Stream {
 	strm := &Stream {
 		Id: id,
 		LastWrite: time.Now(),
-		Url: server.getSources()[iid].Url,
+		Url: server.getSourceById(iid).Url,
 		Active: true,
 	}
 	s.Streams[id] = strm
@@ -150,6 +181,31 @@ func (s *Server) stopStream(id string) {
 	}
 }
 
+func (s *Server) importSourcesCsv(f io.Reader) error {
+	var src Source
+	r := csv.NewReader(f)
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if len(record) > 1 {
+			src.Name = record[0]
+			src.Url = record[1]
+			err = s.addSource(&src)
+			if err != nil {
+			        return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Stream) serveClient(c *gin.Context) {
 //	c.Data(200, "applicatiom/octet-stream", []byte("\n"))
 //	c.Header("Content-Type", "application/octet-stream")
@@ -185,35 +241,6 @@ func (s *Stream) updateRead() {
 	s.LastWrite = time.Now()
 }
 
-func import_sources_csv(file string, server *Server){
-	f, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-
-	r := csv.NewReader(f)
-	stmt, err := server.DB.Prepare("INSERT INTO `sources` (`name`, `url`) VALUES (?,?)")
-	checkErr(err)
-
-	for {
-		record, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if len(record) > 1 {
-
-		        _, err := stmt.Exec(record[0],record[1])
-		        checkErr(err)
-
-			log.Printf("insert table")
-		}
-
-	}
-}
 
 var server Server
 
@@ -340,6 +367,17 @@ func main() {
 
 	router.GET("/sources", func(c *gin.Context) {
 		c.JSON(200, server.getSources())
+	})
+
+	router.POST("/sources/csv", func(c *gin.Context) {
+		bodyR := c.Request.Body
+
+		err := server.importSourcesCsv(bodyR)
+		if err != nil {
+			c.String(500, err.Error())
+		} else {
+			c.String(200, "Imported OK")
+		}
 	})
 
 	router.Run(":8080")
