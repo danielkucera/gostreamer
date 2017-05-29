@@ -31,7 +31,7 @@
     <md-subheader class="md-no-sticky">Stream List</md-subheader>
     <md-list-item ng-repeat="stream in sources | filter: searchFilter" class="noright">
       <md-icon md-font-icon="av" aria-label="Stream URL">movie</md-icon>
-      <md-icon class="md-secondary" ng-click="star_icon=changeStar(star_icon)">{{ star_icon || 'star_border' }}</md-icon>
+      <md-icon class="md-secondary" ng-click="changeStar(stream)">{{ (stream.Weight > 0) ? 'star' : 'star_border' }}</md-icon>
       <md-icon class="md-secondary" ng-click="editSource($event,stream)" aria-label="Chat">edit</md-icon>
       <p>{{ stream.Name }}</p>
       <a href="/stream/{{ stream.Id }}/player.html"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
@@ -100,8 +100,17 @@
 angular.module('listStreams', ['ngMaterial'])
 .controller('ListCtrl', function($scope, $mdDialog, $http) {
 
-  $scope.changeStar = function(star) {
-    return (star=='star')?'star_border':'star';
+  $scope.changeStar = function(source) {
+    if (source.Weight == 0) {
+      source.Weight=100;
+    } else {
+      source.Weight=0;
+    }
+    $http.post("/sources", angular.toJson(source))
+    .then(function(source) {
+      $scope.updateSources();
+    });
+
   }
 
   $scope.addSource = function(evt) {
