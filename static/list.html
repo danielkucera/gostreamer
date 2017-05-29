@@ -24,9 +24,14 @@
         <md-option value="480">480p</md-option>
       </md-select>
     </div>
+    {{ status }}
+    <input class="ng-hide" id="input-file-id" multiple type="file" />
+    <label for="input-file-id" class="md-button md-raised md-primary">Import CSV</label>
     <md-subheader class="md-no-sticky">Stream List</md-subheader>
     <md-list-item ng-repeat="stream in sources | filter: searchFilter" class="noright">
       <md-icon md-font-icon="av" aria-label="Stream URL">movie</md-icon>
+      <md-icon class="md-secondary" ng-click="star_icon=changeStar(star_icon)">{{ star_icon || 'star_border' }}</md-icon>
+      <md-icon class="md-secondary" ng-click="editSource($event,stream)" aria-label="Chat">edit</md-icon>
       <p>{{ stream.Name }}</p>
       <a href="/stream/{{ stream.Id }}/player.html"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
       <a href="/stream/{{ stream.Id }}/hls.m3u8"><md-icon md-font-icon="av" aria-label="Play in Android">android</md-icon></a>
@@ -43,14 +48,84 @@
 
   <!-- Angular Material Library -->
   <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
-  
+
+  <script type="text/ng-template" id="dialogContent.tmpl.html">
+    <md-dialog class="fullscreen-dialog" aria-label="Full Screen Dialog Test">
+      <md-toolbar>
+        <div class="md-toolbar-tools">
+          <h2>Update source</h2>
+          <span flex></span>
+          <md-button class="md-icon-button" ng-click="cancel()">
+            <md-icon>close</md-icon>
+          </md-button>
+        </div>
+      </md-toolbar>
+      <md-dialog-content>
+        <form name="userForm"></form>
+        <md-input-container flex="flex">
+          <label>ID</label>
+          <textarea ng-model="source.Id" disabled></textarea>
+        </md-input-container>
+	</br>
+        <md-input-container flex="flex">
+          <label>Name</label>
+          <textarea ng-model="source.Name" columns="1" md-maxlength="150"></textarea>
+        </md-input-container>
+	</br>
+        <md-input-container flex="flex">
+          <label>URL</label>
+          <textarea ng-model="source.Url" columns="1" md-maxlength="150"></textarea>
+        </md-input-container>
+      </md-dialog-content>
+      <md-dialog-actions layout="row">
+        <span flex></span>
+        <md-button ng-click="confirm(source)">
+          Update
+        </md-button>
+      </md-dialog-actions>
+      </md-dialog>
+  </script>
+ 
+ 
 <script>
 angular.module('listStreams', ['ngMaterial'])
-.controller('ListCtrl', function($scope, $http) {
+.controller('ListCtrl', function($scope, $mdDialog, $http) {
 
-  $http.get("/sources").then(function(response) {
-    $scope.sources = angular.fromJson(response.data);
-  });
+  $scope.changeStar = function(star) {
+    return (star=='star')?'star_border':'star';
+  }
+
+  $scope.editSource = function(evt, src) {
+    source = angular.copy(src);
+    return $mdDialog.show({
+        controller: function($scope) {
+          return angular.extend($scope, {
+            source,
+            cancel: function() {
+              return $mdDialog.cancel();
+            },
+	    confirm: function() {
+	      return $mdDialog.hide(source);
+	    }
+          });
+        },
+	clickOutsideToClose:true,
+        templateUrl: 'dialogContent.tmpl.html',
+        targetEvent: evt
+    }).then(function(source) {
+        $http.post("/sources", angular.toJson(source));
+    }).then(function(response) {
+    	$scope.updateSources();
+    });
+  };
+
+  $scope.updateSources = function() {
+    $http.get("/sources").then(function(response) {
+      $scope.sources = angular.fromJson(response.data);
+    });
+  }
+ 
+  $scope.updateSources();
 
 });
 </script>

@@ -44,7 +44,7 @@ type Server struct {
 func (s *Server) getSources() []*Source {
 	srcs := make([]*Source,0)
 
-        rows, err := s.DB.Query("SELECT `id`,`name`,`url` FROM `sources`")
+        rows, err := s.DB.Query("SELECT `id`,`name`,`url` FROM `sources` ORDER BY `weight` DESC, `id` ASC")
         checkErr(err)
 
         for rows.Next() {
@@ -64,6 +64,19 @@ func (s *Server) addSource(src *Source) error {
 		return err
 	}
 	_, err = stmt.Exec(src.Name,src.Url)
+        if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) updateSource(src *Source) error {
+	log.Printf("updating %s", src.Name)
+	stmt, err := s.DB.Prepare("UPDATE `sources` SET `name` = ?, `url` = ? WHERE id = ?")
+        if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(src.Name,src.Url,src.Id)
         if err != nil {
 		return err
 	}
@@ -275,7 +288,7 @@ func createDB() *sql.DB {
 	db, err := sql.Open("sqlite3", db_file)
         checkErr(err)
 
-	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL)")
+	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL, `weight` INTEGER)")
         checkErr(err)
 	log.Printf("created table")
 
@@ -367,6 +380,24 @@ func main() {
 
 	router.GET("/sources", func(c *gin.Context) {
 		c.JSON(200, server.getSources())
+	})
+
+	router.POST("/sources", func(c *gin.Context) {
+		var src Source
+		err := c.BindJSON(&src)
+	        if err != nil {
+			c.AbortWithError(400, err)
+		}
+		if src.Id == 0 {
+			err = server.addSource(&src)
+		} else {
+			err = server.updateSource(&src)
+		}
+	        if err != nil {
+			c.AbortWithError(400, err)
+		} else {
+			c.String(200, "Updated OK")
+		}
 	})
 
 	router.POST("/sources/csv", func(c *gin.Context) {
