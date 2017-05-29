@@ -54,7 +54,7 @@
     <md-dialog class="fullscreen-dialog" aria-label="Full Screen Dialog Test">
       <md-toolbar>
         <div class="md-toolbar-tools">
-          <h2>Update source</h2>
+	  <h2>{{ source.Id ? 'Update' : 'Add' }} source</h2>
           <span flex></span>
           <md-button class="md-icon-button" ng-click="cancel()">
             <md-icon>close</md-icon>
@@ -84,9 +84,12 @@
         </md-input-container>
       </md-dialog-content>
       <md-dialog-actions layout="row">
+	<md-button ng-click="delete(source)">
+          DELETE
+        </md-button>
         <span flex></span>
         <md-button ng-click="confirm(source)">
-          Update
+          Confirm
         </md-button>
       </md-dialog-actions>
       </md-dialog>
@@ -115,6 +118,11 @@ angular.module('listStreams', ['ngMaterial'])
               return $mdDialog.cancel();
             },
 	    confirm: function() {
+              $http.post("/sources", angular.toJson(source));
+	      return $mdDialog.hide(source);
+	    },
+	    delete: function() {
+              $http.delete("/sources/"+source.Id);
 	      return $mdDialog.hide(source);
 	    }
           });
@@ -123,10 +131,7 @@ angular.module('listStreams', ['ngMaterial'])
         templateUrl: 'dialogContent.tmpl.html',
         targetEvent: evt
     }).then(function(source) {
-        $http.post("/sources", angular.toJson(source))
-	.then(function(response) {
-    	  $scope.updateSources();
-	});
+      $scope.updateSources();
     });
   };
 

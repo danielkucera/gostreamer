@@ -83,6 +83,19 @@ func (s *Server) updateSource(src *Source) error {
 	return nil
 }
 
+func (s *Server) deleteSource(src *Source) error {
+	log.Printf("deleting %s", src.Name)
+	stmt, err := s.DB.Prepare("DELETE FROM `sources` WHERE id = ?")
+        if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(src.Id)
+        if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Server) getSourceById(id int) *Source {
 
         stmt, err := s.DB.Prepare("SELECT `id`,`name`,`url`,`weight` FROM `sources` WHERE `id` = ?")
@@ -387,6 +400,7 @@ func main() {
 		err := c.BindJSON(&src)
 	        if err != nil {
 			c.AbortWithError(400, err)
+			return
 		}
 		if src.Id == 0 {
 			err = server.addSource(&src)
@@ -397,6 +411,24 @@ func main() {
 			c.AbortWithError(400, err)
 		} else {
 			c.String(200, "Updated OK")
+		}
+	})
+
+	router.DELETE("/sources/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		iid, err := strconv.Atoi(id)
+	        if err != nil {
+			c.AbortWithError(400, err)
+			return
+		}
+		src := Source {
+			Id: iid,
+		}
+		err = server.deleteSource(&src)
+	        if err != nil {
+			c.AbortWithError(400, err)
+		} else {
+			c.String(200, "Deleted OK")
 		}
 	})
 
