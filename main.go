@@ -1,8 +1,9 @@
 package main
 
 import (
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/gin-gonic/gin"
-	"encoding/base64"
 	"encoding/csv"
 	"strconv"
 	"os/exec"
@@ -13,6 +14,8 @@ import (
 	"log"
 	"time"
 )
+
+var db_file = "./db.sqlite"
 
 type Stream struct {
 	Id	string
@@ -35,7 +38,23 @@ type Source struct {
 
 type Server struct {
 	Streams map[string]*Stream
-	Sources []*Source
+	DB	*sql.DB
+}
+
+func (s *Server) getSources() []*Source {
+	srcs := make([]*Source,0)
+
+        rows, err := s.DB.Query("SELECT `id`,`name`,`url` FROM `sources`")
+        checkErr(err)
+
+        for rows.Next() {
+            var src Source
+            err = rows.Scan(&src.Id, &src.Name, &src.Url)
+            checkErr(err)
+            srcs = append(srcs, &src)
+        }
+
+	return srcs
 }
 
 func (s *Server) createStream(id string) *Stream {
@@ -45,7 +64,7 @@ func (s *Server) createStream(id string) *Stream {
 	strm := &Stream {
 		Id: id,
 		LastWrite: time.Now(),
-		Url: server.Sources[iid].Url,
+		Url: server.getSources()[iid].Url,
 		Active: true,
 	}
 	s.Streams[id] = strm
@@ -166,14 +185,15 @@ func (s *Stream) updateRead() {
 	s.LastWrite = time.Now()
 }
 
-func load_sources_csv(file string, server *Server){
+func import_sources_csv(file string, server *Server){
 	f, err := os.Open(file)
 	if err != nil {
 		panic(err)
 	}
 
 	r := csv.NewReader(f)
-	i := 0
+	stmt, err := server.DB.Prepare("INSERT INTO `sources` (`name`, `url`) VALUES (?,?)")
+	checkErr(err)
 
 	for {
 		record, err := r.Read()
@@ -185,14 +205,11 @@ func load_sources_csv(file string, server *Server){
 		}
 
 		if len(record) > 1 {
-			src := Source {
-				Id: i,
-				Name: record[0],
-				Url: record[1],
-				UrlEncoded: base64.StdEncoding.EncodeToString([]byte(record[1])),
-			}
-			server.Sources = append(server.Sources, &src)
-			i = i + 1
+
+		        _, err := stmt.Exec(record[0],record[1])
+		        checkErr(err)
+
+			log.Printf("insert table")
 		}
 
 	}
@@ -205,6 +222,41 @@ func SetHeaders(c *gin.Context) {
 	c.Next()
 }
 
+func checkErr(err error) {
+	if err != nil {
+		log.Printf("err: %s", err)
+		panic(err)
+	}
+}
+
+func openDB() *sql.DB {
+	var db *sql.DB
+	log.Printf("opening db")
+	_, err := os.Stat(db_file);
+	if err != nil {
+		db = createDB()
+	} else {
+		db, err = sql.Open("sqlite3", db_file)
+		checkErr(err)
+	}
+	return db
+}
+
+func createDB() *sql.DB {
+	log.Printf("creating db")
+
+	db, err := sql.Open("sqlite3", db_file)
+        checkErr(err)
+
+	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL)")
+        checkErr(err)
+	log.Printf("created table")
+
+	log.Printf("db created")
+
+	return db
+}
+
 func main() {
 	router := gin.Default()
 	router.Use(SetHeaders)
@@ -212,10 +264,8 @@ func main() {
 
 	server = Server{
 		Streams: make(map[string]*Stream, 0),
-		Sources: make([]*Source, 0),
+		DB: openDB(),
 	}
-
-	load_sources_csv("sources.csv", &server)
 
 	router.GET("/", func(c *gin.Context) {
 		c.Redirect(307, "/static/list.html")
@@ -279,12 +329,17 @@ func main() {
 		c.Data(200, "audio/mpegurl", []byte(m3u))
 	})
 
+	stream.GET("status", func(c *gin.Context) {
+		strm := c.MustGet("stream").(*Stream)
+		c.JSON(200, strm)
+	})
+
 	router.GET("/status", func(c *gin.Context) {
 		c.JSON(200, server)
 	})
 
 	router.GET("/sources", func(c *gin.Context) {
-		c.JSON(200, server.Sources)
+		c.JSON(200, server.getSources())
 	})
 
 	router.Run(":8080")
