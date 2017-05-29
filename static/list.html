@@ -76,6 +76,11 @@
           <label>URL</label>
           <textarea ng-model="source.Url" columns="1" md-maxlength="150"></textarea>
         </md-input-container>
+	</br>
+        <md-input-container flex="flex">
+          <label>Weight</label>
+          <input type="number" ng-model="source.Weight" />
+        </md-input-container>
       </md-dialog-content>
       <md-dialog-actions layout="row">
         <span flex></span>
@@ -113,9 +118,10 @@ angular.module('listStreams', ['ngMaterial'])
         templateUrl: 'dialogContent.tmpl.html',
         targetEvent: evt
     }).then(function(source) {
-        $http.post("/sources", angular.toJson(source));
-    }).then(function(response) {
-    	$scope.updateSources();
+        $http.post("/sources", angular.toJson(source))
+	.then(function(response) {
+    	  $scope.updateSources();
+	});
     });
   };
 

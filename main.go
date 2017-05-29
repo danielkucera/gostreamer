@@ -33,7 +33,7 @@ type Source struct {
 	Id	int
 	Name	string
 	Url	string
-	UrlEncoded	string
+	Weight	int
 }
 
 type Server struct {
@@ -44,12 +44,12 @@ type Server struct {
 func (s *Server) getSources() []*Source {
 	srcs := make([]*Source,0)
 
-        rows, err := s.DB.Query("SELECT `id`,`name`,`url` FROM `sources` ORDER BY `weight` DESC, `id` ASC")
+        rows, err := s.DB.Query("SELECT `id`,`name`,`url`,`weight` FROM `sources` ORDER BY `weight` DESC, `id` ASC")
         checkErr(err)
 
         for rows.Next() {
             var src Source
-            err = rows.Scan(&src.Id, &src.Name, &src.Url)
+            err = rows.Scan(&src.Id, &src.Name, &src.Url, &src.Weight)
             checkErr(err)
             srcs = append(srcs, &src)
         }
@@ -59,11 +59,11 @@ func (s *Server) getSources() []*Source {
 
 func (s *Server) addSource(src *Source) error {
 	log.Printf("addding %s", src.Name)
-	stmt, err := s.DB.Prepare("INSERT INTO `sources` (`name`, `url`) VALUES (?,?)")
+	stmt, err := s.DB.Prepare("INSERT INTO `sources` (`name`, `url`, `weight`) VALUES (?,?,?)")
         if err != nil {
 		return err
 	}
-	_, err = stmt.Exec(src.Name,src.Url)
+	_, err = stmt.Exec(src.Name,src.Url,src.Weight)
         if err != nil {
 		return err
 	}
@@ -72,11 +72,11 @@ func (s *Server) addSource(src *Source) error {
 
 func (s *Server) updateSource(src *Source) error {
 	log.Printf("updating %s", src.Name)
-	stmt, err := s.DB.Prepare("UPDATE `sources` SET `name` = ?, `url` = ? WHERE id = ?")
+	stmt, err := s.DB.Prepare("UPDATE `sources` SET `name` = ?, `url` = ?, `weight` = ? WHERE id = ?")
         if err != nil {
 		return err
 	}
-	_, err = stmt.Exec(src.Name,src.Url,src.Id)
+	_, err = stmt.Exec(src.Name,src.Url,src.Weight,src.Id)
         if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (s *Server) updateSource(src *Source) error {
 
 func (s *Server) getSourceById(id int) *Source {
 
-        stmt, err := s.DB.Prepare("SELECT `id`,`name`,`url` FROM `sources` WHERE `id` = ?")
+        stmt, err := s.DB.Prepare("SELECT `id`,`name`,`url`,`weight` FROM `sources` WHERE `id` = ?")
         checkErr(err)
 
 	rows, err := stmt.Query(id)
@@ -93,7 +93,7 @@ func (s *Server) getSourceById(id int) *Source {
 
         if rows.Next() {
             var src Source
-            err = rows.Scan(&src.Id, &src.Name, &src.Url)
+            err = rows.Scan(&src.Id, &src.Name, &src.Url, &src.Weight)
             checkErr(err)
             return &src
         } else {
@@ -288,7 +288,7 @@ func createDB() *sql.DB {
 	db, err := sql.Open("sqlite3", db_file)
         checkErr(err)
 
-	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL, `weight` INTEGER)")
+	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL, `weight` INTEGER DEFAULT 0")
         checkErr(err)
 	log.Printf("created table")
 
