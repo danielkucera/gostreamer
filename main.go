@@ -443,5 +443,30 @@ func main() {
 		}
 	})
 
+	router.GET("/sources/export.m3u", func(c *gin.Context) {
+		srcs := server.getSources()
+
+		m3u := "#EXTM3U\n"
+
+		for _,src := range srcs {
+			m3u = m3u + "#EXTINF:-1,"+src.Name+"\n"
+			m3u = m3u + src.Url+"\n"
+		}
+		c.Data(200, "audio/mpegurl", []byte(m3u))
+	})
+
+	router.GET("/sources/export.csv", func(c *gin.Context) {
+		srcs := server.getSources()
+
+		c.Header("Content-Type", "text/csv")
+		w := csv.NewWriter(c.Writer)
+
+		for _,src := range srcs {
+			if err := w.Write([]string{src.Name,src.Url,strconv.Itoa(src.Weight)}); err != nil {
+				log.Printf("error writing record to csv:", err)
+			}
+		}
+	})
+
 	router.Run(":8080")
 }
