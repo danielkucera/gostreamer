@@ -145,7 +145,7 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
 		"-hls_base_url", "/data/",
-		"-hls_segment_filename", "data/stream-"+id+"-%Y%m%d-%s.ts",
+		"-hls_segment_filename", "data/chunk-%Y%m%d-%s-stream-"+id+".ts",
 		"-f", "hls",
 		"-method", "PUT", "http://localhost:8080/stream/"+id+"/hls.m3u8",
 	)
