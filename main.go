@@ -130,6 +130,7 @@ func (s *Server) createStream(id string) *Stream {
 		"./ffmpeg",
 		"-nostats",
 		"-progress", "/dev/stdout",
+		"-re",
 		"-i", strm.Url,
 		"-map", "0",
 		"-copy_unknown",
