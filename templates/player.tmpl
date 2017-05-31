@@ -6,7 +6,8 @@
   if(Hls.isSupported()) {
     var video = document.getElementById('video');
     var config = {
-      retry: -1
+      retry: -1,
+      manifestLoadingMaxRetry: 5
     };
     var hls = new Hls(config);
     hls.loadSource('/stream/{{ .id }}/hls.m3u8');
