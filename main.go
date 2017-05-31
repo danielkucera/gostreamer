@@ -136,6 +136,7 @@ func (s *Server) createStream(id string) *Stream {
 		"-deinterlace",
 		"-c:v", "h264",
 		"-preset", "fast",
+		"-x264opts", "keyint=120:min-keyint=120:scenecut=-1",
 		"-b:v", "1024k",
 		"-c:a", "aac",
 		"-b:a", "192k",
@@ -145,7 +146,7 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
 		"-hls_base_url", "/data/",
-		"-hls_segment_filename", "data/chunk-%Y%m%d-%s-stream-"+id+".ts",
+		"-hls_segment_filename", "data/chunk-%Y%m%d-%H%M%S-stream-"+id+".ts",
 		"-f", "hls",
 		"-method", "PUT", "http://localhost:8080/stream/"+id+"/hls.m3u8",
 	)
