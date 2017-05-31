@@ -140,7 +140,8 @@ func (s *Server) createStream(id string) *Stream {
 		"-c:a", "aac",
 		"-b:a", "192k",
 		"-start_number", "0",
-		"-hls_time", "3",
+		"-hls_init_time", "2",
+		"-hls_time", "6",
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
 		"-hls_base_url", "/data/",
@@ -306,7 +307,7 @@ func createDB() *sql.DB {
 	db, err := sql.Open("sqlite3", db_file)
         checkErr(err)
 
-	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL, `weight` INTEGER DEFAULT 0")
+	_, err = db.Exec("CREATE TABLE `sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(256) NULL, `url` VARCHAR(256) NOT NULL, `weight` INTEGER NOT NULL DEFAULT 0)")
         checkErr(err)
 	log.Printf("created table")
 
