@@ -46,6 +46,7 @@ func (s *Server) getSources() []*Source {
 
         rows, err := s.DB.Query("SELECT `id`,`name`,`url`,`weight` FROM `sources` ORDER BY `weight` DESC, `id` ASC")
         checkErr(err)
+	defer rows.Close()
 
         for rows.Next() {
             var src Source
@@ -103,6 +104,7 @@ func (s *Server) getSourceById(id int) *Source {
 
 	rows, err := stmt.Query(id)
 	checkErr(err)
+	defer rows.Close()
 
         if rows.Next() {
             var src Source
