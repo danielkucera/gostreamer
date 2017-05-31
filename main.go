@@ -26,7 +26,7 @@ type Stream struct {
 	Playlist string
 	LastChunk string
 	Stderr	string
-	Stdout	io.ReadCloser
+	Stats	string
 }
 
 type Source struct {
@@ -128,6 +128,8 @@ func (s *Server) createStream(id string) *Stream {
 
 	cmd := exec.Command(
 		"./ffmpeg",
+		"-nostats",
+		"-progress", "/dev/stdout",
 		"-i", strm.Url,
 		"-map", "0",
 		"-copy_unknown",
@@ -161,6 +163,12 @@ func (s *Server) createStream(id string) *Stream {
 		return nil
 	}
 
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Printf("%s", err)
+		return nil
+	}
+
 	done := make(chan bool)
 
 	go func() {
@@ -170,6 +178,17 @@ func (s *Server) createStream(id string) *Stream {
 		for err == nil {
 			lng, err = stderr.Read(buf)
 			strm.Stderr = strm.Stderr + string(buf)[0:lng]
+		}
+		done <- true
+	}()
+
+	go func() {
+		buf := make([]byte, 1024)
+		var err error
+		var lng int
+		for err == nil {
+			lng, err = stdout.Read(buf)
+			strm.Stats = string(buf)[0:lng]
 		}
 		done <- true
 	}()
