@@ -223,6 +223,11 @@ func (s *Server) importSourcesCsv(f io.Reader) error {
 		if len(record) > 1 {
 			src.Name = record[0]
 			src.Url = record[1]
+			if len(record) > 2 {
+				iid,_ := strconv.Atoi(record[2])
+				src.Weight = iid
+
+			}
 			err = s.addSource(&src)
 			if err != nil {
 			        return err
