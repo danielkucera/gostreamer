@@ -439,9 +439,9 @@ func main() {
 	})
 
 	router.POST("/sources/csv", func(c *gin.Context) {
-		bodyR := c.Request.Body
+		file, _, _ := c.Request.FormFile("csvImport")
 
-		err := server.importSourcesCsv(bodyR)
+		err := server.importSourcesCsv(file)
 		if err != nil {
 			c.String(500, err.Error())
 		} else {
@@ -472,6 +472,7 @@ func main() {
 				log.Printf("error writing record to csv:", err)
 			}
 		}
+		w.Flush()
 	})
 
 	router.Run(":8080")
