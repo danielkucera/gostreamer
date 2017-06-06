@@ -262,6 +262,7 @@ func (s *Server) importSourcesCsv(f io.Reader) error {
 }
 
 func (s *Stream) serveClient(c *gin.Context) {
+	client := c.Request.RemoteAddr
 //	c.Data(200, "applicatiom/octet-stream", []byte("\n"))
 //	c.Header("Content-Type", "application/octet-stream")
 	headers := `HTTP/1.1 200 OK
@@ -281,6 +282,7 @@ Content-Type: applicatiom/octet-stream
 		if err != nil {
 			break
 		}
+		log.Printf("serving %s to %s\n", toRead, client)
 		_, err = io.Copy(rw.Writer, f)
 		if err != nil {
 			break
@@ -498,5 +500,5 @@ func main() {
 		w.Flush()
 	})
 
-	router.Run(":8080")
+	router.Run("127.0.0.1:8080")
 }
