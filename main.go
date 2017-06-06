@@ -343,10 +343,26 @@ func createDB() *sql.DB {
 	return db
 }
 
+func dataCleanup(interval time.Duration, age time.Duration) {
+	folder := "./data/"
+	for {
+		files, _ := ioutil.ReadDir(folder)
+		for _, f := range files {
+			if strings.HasSuffix(f.Name(), ".ts") && time.Now().Sub(f.ModTime()) > age {
+				log.Printf("cleanup: deleting %s modified %s\n", f.Name(), f.ModTime())
+				os.Remove(folder + f.Name())
+			}
+		}
+		time.Sleep(interval)
+	}
+}
+
 func main() {
 	router := gin.Default()
 	router.Use(SetHeaders)
 	router.LoadHTMLGlob("templates/*")
+
+	go dataCleanup(time.Hour, time.Hour*48)
 
 	server = Server{
 		Streams: make(map[string]*Stream, 0),
