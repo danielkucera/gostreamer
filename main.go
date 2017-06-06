@@ -17,6 +17,11 @@ import (
 
 var db_file = "./db.sqlite"
 
+type Chunk struct {
+	Path	string
+	Next	*Chunk
+}
+
 type Stream struct {
 	Id	string
 	Url	string
@@ -24,7 +29,7 @@ type Stream struct {
 	Cmd	*exec.Cmd
 	LastWrite time.Time
 	Playlist string
-	LastChunk string
+	LastChunk *Chunk
 	ListUpdate time.Time
 	Stderr	string
 	Stats	string
@@ -274,30 +279,53 @@ Content-Type: applicatiom/octet-stream
 	_, rw, _ := c.Writer.Hijack()
 	rw.Writer.Write([]byte(headers))
 
-	for s.LastChunk == "" {
-		time.Sleep(time.Second)
-	}
+	chunk := s.getLastChunk()
 	var err error
 	for err == nil {
-		toRead := s.LastChunk
+		toRead := chunk.Path
 		f, err := os.Open("."+toRead)
 		if err != nil {
 			break
 		}
 		log.Printf("serving %s to %s\n", toRead, client)
 		_, err = io.Copy(rw.Writer, f)
+		f.Close()
 		if err != nil {
 			break
 		}
 		s.updateRead()
-		for toRead == s.LastChunk {
-			time.Sleep(time.Millisecond*100)
-		}
+		chunk = chunk.getNext()
 	}
 }
 
 func (s *Stream) updateRead() {
 	s.LastWrite = time.Now()
+}
+
+func (s *Stream) addChunk(path string) {
+	chunk := &Chunk {
+		Path: path,
+	}
+	if s.LastChunk == nil {
+		s.LastChunk = chunk
+	} else {
+		s.LastChunk.Next = chunk
+		s.LastChunk = chunk
+	}
+}
+
+func (s *Stream) getLastChunk() *Chunk {
+	for s.LastChunk == nil {
+		time.Sleep(100*time.Millisecond)
+	}
+	return s.LastChunk
+}
+
+func (ch *Chunk) getNext() *Chunk {
+	for ch.Next == nil {
+		time.Sleep(100*time.Millisecond)
+	}
+	return ch.Next
 }
 
 
@@ -419,9 +447,10 @@ func main() {
 
 		strm.Playlist = sbody
 		lines := strings.Split(sbody, "\n")
-		strm.LastChunk = lines[len(lines)-2]
+		lastItem := lines[len(lines)-2]
+		strm.addChunk(lastItem)
 		updateTime := time.Now()
-		log.Printf("List updated after %s with %s\n", updateTime.Sub(strm.ListUpdate), strm.LastChunk)
+		log.Printf("List updated after %s with %s\n", updateTime.Sub(strm.ListUpdate), lastItem)
 		strm.ListUpdate = updateTime
 	})
 
