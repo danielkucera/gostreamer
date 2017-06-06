@@ -25,6 +25,7 @@ type Stream struct {
 	LastWrite time.Time
 	Playlist string
 	LastChunk string
+	ListUpdate time.Time
 	Stderr	string
 	Stats	string
 }
@@ -123,6 +124,7 @@ func (s *Server) createStream(id string) *Stream {
 	strm := &Stream {
 		Id: id,
 		LastWrite: time.Now(),
+		ListUpdate: time.Now(),
 		Url: server.getSourceById(iid).Url,
 		Active: true,
 	}
@@ -140,13 +142,13 @@ func (s *Server) createStream(id string) *Stream {
 		"-dn", //data none
 		"-deinterlace",
 		"-c:v", "h264",
+		"-force_key_frames", "expr:gte(t,n_forced*1)",
 		"-preset", "fast",
-		"-x264opts", "keyint=120:min-keyint=120:scenecut=-1",
 		"-b:v", "1024k",
 		"-c:a", "aac",
 		"-b:a", "192k",
 		"-start_number", "0",
-		"-hls_init_time", "2",
+		"-hls_init_time", "3",
 		"-hls_time", "6",
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
@@ -402,6 +404,9 @@ func main() {
 		strm.Playlist = sbody
 		lines := strings.Split(sbody, "\n")
 		strm.LastChunk = lines[len(lines)-2]
+		updateTime := time.Now()
+		log.Printf("List updated after %s with %s\n", updateTime.Sub(strm.ListUpdate), strm.LastChunk)
+		strm.ListUpdate = updateTime
 	})
 
 
