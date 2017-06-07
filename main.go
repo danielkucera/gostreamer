@@ -179,8 +179,6 @@ func (s *Server) createStream(id string) *Stream {
 		return nil
 	}
 
-	done := make(chan bool)
-
 	go func() {
 		buf := make([]byte, 1024)
 		var err error
@@ -189,7 +187,7 @@ func (s *Server) createStream(id string) *Stream {
 			lng, err = stderr.Read(buf)
 			strm.Stderr = strm.Stderr + string(buf)[0:lng]
 		}
-		done <- true
+		strm.stop()
 	}()
 
 	go func() {
@@ -200,7 +198,7 @@ func (s *Server) createStream(id string) *Stream {
 			lng, err = stdout.Read(buf)
 			strm.Stats = string(buf)[0:lng]
 		}
-		done <- true
+		strm.stop()
 	}()
 
 	go func() {
@@ -208,8 +206,7 @@ func (s *Server) createStream(id string) *Stream {
 			time.Sleep(time.Second*5)
 		}
 		log.Printf("no client on stream %s", strm.Url)
-		server.stopStream(id)
-		done <- true
+		strm.stop()
 	}()
 
 	err = cmd.Start();
@@ -226,15 +223,6 @@ func (s *Server) getStream(id string) *Stream {
 		return val;
 	} else {
 		return s.createStream(id)
-	}
-}
-
-func (s *Server) stopStream(id string) {
-	log.Printf("stopping stream %s", id)
-	if val, ok := s.Streams[id]; ok {
-		val.Active = false
-		val.Cmd.Process.Kill()
-		//TODO: kill clients
 	}
 }
 
@@ -268,6 +256,16 @@ func (s *Server) importSourcesCsv(f io.Reader) error {
 	return nil
 }
 
+func (s *Stream) stop() {
+	log.Printf("stopping stream %s", s.Id)
+	if s.Active {
+		s.Active = false
+		s.Cmd.Process.Kill()
+		//TODO: kill clients
+	}
+}
+
+
 func (s *Stream) serveClient(c *gin.Context) {
 	client := c.Request.RemoteAddr
 //	c.Data(200, "applicatiom/octet-stream", []byte("\n"))
@@ -276,18 +274,18 @@ func (s *Stream) serveClient(c *gin.Context) {
 Content-Type: applicatiom/octet-stream
 
 `
-	_, rw, _ := c.Writer.Hijack()
+	con, rw, _ := c.Writer.Hijack()
 	rw.Writer.Write([]byte(headers))
 
 	chunk := s.getLastChunk()
 	var err error
 	for err == nil {
 		toRead := chunk.Path
+		log.Printf("serving %s to %s\n", toRead, client)
 		f, err := os.Open("."+toRead)
 		if err != nil {
 			break
 		}
-		log.Printf("serving %s to %s\n", toRead, client)
 		_, err = io.Copy(rw.Writer, f)
 		f.Close()
 		if err != nil {
@@ -296,6 +294,7 @@ Content-Type: applicatiom/octet-stream
 		s.updateRead()
 		chunk = chunk.getNext()
 	}
+	con.Close()
 }
 
 func (s *Stream) updateRead() {
