@@ -19,6 +19,7 @@ var db_file = "./db.sqlite"
 
 type Chunk struct {
 	Path	string
+	Published time.Time
 	Next	*Chunk
 }
 
@@ -153,7 +154,6 @@ func (s *Server) createStream(id string) *Stream {
 		"-c:a", "aac",
 		"-b:a", "192k",
 		"-start_number", "0",
-		"-hls_init_time", "3",
 		"-hls_time", "6",
 		"-hls_list_size", "10",
 		"-use_localtime", "1",
@@ -275,26 +275,46 @@ Content-Type: applicatiom/octet-stream
 
 `
 	con, rw, _ := c.Writer.Hijack()
+	defer con.Close()
 	rw.Writer.Write([]byte(headers))
 
 	chunk := s.getLastChunk()
-	var err error
-	for err == nil {
+	prevChunkPublished := chunk.Published
+	buf := make([]byte, 4096)
+	for {
 		toRead := chunk.Path
-		log.Printf("serving %s to %s\n", toRead, client)
 		f, err := os.Open("."+toRead)
 		if err != nil {
-			break
+			return
 		}
-		_, err = io.Copy(rw.Writer, f)
-		f.Close()
+		fi, err := f.Stat()
 		if err != nil {
-			break
+			return
 		}
+		interval := 85*chunk.Published.Sub(prevChunkPublished)/
+			time.Duration(100*int(fi.Size()/int64(len(buf))))
+		if chunk.Next != nil { //don't throttle if we are behind
+			interval = 0
+		}
+		speed := float64(len(buf))/
+			(interval.Seconds()*1024)
+		log.Printf("serving %s long %d to %s with br %fKiB/s\n", toRead, fi.Size(),  client, speed)
+		for {
+			_, err = f.Read(buf)
+			if err != nil {
+				break
+			}
+			_, err = rw.Writer.Write(buf)
+			if err != nil {
+				return
+			}
+			time.Sleep(interval)
+		}
+		f.Close()
 		s.updateRead()
+		prevChunkPublished = chunk.Published
 		chunk = chunk.getNext()
 	}
-	con.Close()
 }
 
 func (s *Stream) updateRead() {
@@ -304,6 +324,7 @@ func (s *Stream) updateRead() {
 func (s *Stream) addChunk(path string) {
 	chunk := &Chunk {
 		Path: path,
+		Published: time.Now(),
 	}
 	if s.LastChunk == nil {
 		s.LastChunk = chunk
