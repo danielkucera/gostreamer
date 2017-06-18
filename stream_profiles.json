@@ -1,0 +1,29 @@
+[
+    {
+        "name": "orig-1Mbps",
+	"params": [
+            "-map", "0",
+            "-copy_unknown",
+            "-sn",
+            "-dn",
+            "-deinterlace",
+            "-c:v", "h264",
+            "-preset", "fast",
+            "-b:v", "1024k",
+            "-c:a", "aac",
+            "-b:a", "192k"
+        ]
+    },
+    {
+	"name": "copy",
+	"params": [
+            "-analyzeduration", "1000000",
+            "-map", "0",
+            "-copy_unknown",
+            "-sn",
+            "-dn",
+            "-c:v", "copy",
+            "-c:a", "copy"
+        ]
+    }
+]

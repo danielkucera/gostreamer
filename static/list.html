@@ -1,5 +1,6 @@
 <html>
 <head>
+  <title>gostream: Stream list</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- Angular Material style sheet -->
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.css">
@@ -13,21 +14,15 @@
         <label>Search</label>
         <input type="text" ng-model="searchFilter">
       </md-input-container>
-      <md-select ng-model="bitrate" placeholder="Bitrate" class="md-no-underline">
-        <md-option value="2048">2Mbps</md-option>
-        <md-option selected value="1024">1Mbps</md-option>
-        <md-option value="512">512kbps</md-option>
-      </md-select>
-      <md-select ng-model="resolution" placeholder="Resolution" class="md-no-underline">
-        <md-option selected value="1080">1080p</md-option>
-        <md-option value="720">720p</md-option>
-        <md-option value="480">480p</md-option>
+      <md-select ng-model="selected_profile" placeholder="Stream profile" class="md-no-underline">
+        <md-option ng-repeat="profile in profiles" value="{{profile.Name}}">{{profile.Name}}</md-option>
       </md-select>
     </div>
     {{ status }}
     <form action="/sources/csv" method="POST" enctype="multipart/form-data">
-      <input type="file" name="csvImport" />
-      <button type="submit">Upload </button>
+      <input class="ng-hide" id="input-file-id" type="file" name="csvImport" />
+      <label for="input-file-id" class="md-button md-raised md-primary">Choose file</label>
+      <md-button type="submit" class="md-raised md-primary">Import</md-button>
     </form>
     <md-button ng-click="addSource($event)" class="md-raised md-primary">+ Add source</md-button>
     <md-button href="/sources/export.csv" class="md-raised md-primary">Export CSV</md-button>
@@ -38,10 +33,10 @@
       <md-icon class="md-secondary" ng-click="changeStar(stream)">{{ (stream.Weight > 0) ? 'star' : 'star_border' }}</md-icon>
       <md-icon class="md-secondary" ng-click="editSource($event,stream)" aria-label="Chat">edit</md-icon>
       <p>{{ stream.Name }}</p>
-      <a href="/stream/{{ stream.Id }}/player.html"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
-      <a href="/stream/{{ stream.Id }}/hls.m3u8"><md-icon md-font-icon="av" aria-label="Play in Android">android</md-icon></a>
-      <a href="/stream/{{ stream.Id }}/stream.ts"><md-icon md-font-icon="content" aria-label="Stream URL">link</md-icon></a>
-      <a href="/stream/{{ stream.Id }}/list.m3u"><md-icon md-font-icon="av" aria-label="Play in playlist">playlist_play</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/{{ selected_profile }}/player.html"><md-icon md-font-icon="av" aria-label="Play HLS in Browser">live_tv</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/{{ selected_profile }}/hls.m3u8"><md-icon md-font-icon="av" aria-label="Play in Android">android</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/{{ selected_profile }}/stream.ts"><md-icon md-font-icon="content" aria-label="Stream URL">link</md-icon></a>
+      <a href="/stream/{{ stream.Id }}/{{ selected_profile }}/list.m3u"><md-icon md-font-icon="av" aria-label="Play in playlist">playlist_play</md-icon></a>
     </md-list-item>
   </md-list>
   
@@ -153,8 +148,16 @@ angular.module('listStreams', ['ngMaterial'])
       $scope.sources = angular.fromJson(response.data);
     });
   }
+
+  $scope.updateProfiles = function() {
+    $http.get("/profiles").then(function(response) {
+      $scope.profiles = angular.fromJson(response.data);
+      $scope.selected_profile = $scope.profiles[0].Name;
+    });
+  }
  
   $scope.updateSources();
+  $scope.updateProfiles();
 
 });
 </script>

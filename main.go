@@ -5,6 +5,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/gin-gonic/gin"
 	"encoding/csv"
+	"encoding/json"
 	"strconv"
 	"os/exec"
 	"io"
@@ -27,6 +28,7 @@ type Stream struct {
 	Id	string
 	Url	string
 	Active	bool
+	Profile *Profile
 	Cmd	*exec.Cmd
 	LastWrite time.Time
 	Playlist string
@@ -47,6 +49,13 @@ type Server struct {
 	Streams map[string]*Stream
 	DB	*sql.DB
 }
+
+type Profile struct {
+	Name    string
+	Params  []string
+}
+
+var stream_profiles []*Profile
 
 func (s *Server) getSources() []*Source {
 	srcs := make([]*Source,0)
@@ -123,36 +132,39 @@ func (s *Server) getSourceById(id int) *Source {
 	}
 }
 
-func (s *Server) createStream(id string) *Stream {
 
+func (s *Server) createStream(id string, profile_name string) *Stream {
+
+	var profile *Profile
 	iid, _ := strconv.Atoi(id)
+	for _,prof := range stream_profiles {
+		if prof.Name == profile_name {
+			profile = prof
+			break
+		}
+	}
+	if profile == nil {
+		log.Printf("stream profiles doesn't exist")
+		return nil
+	}
 
 	strm := &Stream {
-		Id: id,
 		LastWrite: time.Now(),
 		ListUpdate: time.Now(),
+		Profile: profile,
 		Url: server.getSourceById(iid).Url,
 		Active: true,
 	}
-	s.Streams[id] = strm
 
-	cmd := exec.Command(
-		"./ffmpeg",
+	params := []string{
 		"-nostats",
 		"-progress", "/dev/stdout",
 		"-re",
 		"-i", strm.Url,
-		"-map", "0",
-		"-copy_unknown",
-		"-sn", //subtitle none
-		"-dn", //data none
-		"-deinterlace",
-		"-c:v", "h264",
+	}
+	params = append(params, strm.Profile.Params...)
+	params = append(params, []string{
 		"-force_key_frames", "expr:gte(t,n_forced*1)",
-		"-preset", "fast",
-		"-b:v", "1024k",
-		"-c:a", "aac",
-		"-b:a", "192k",
 		"-start_number", "0",
 		"-hls_time", "6",
 		"-hls_list_size", "10",
@@ -160,8 +172,10 @@ func (s *Server) createStream(id string) *Stream {
 		"-hls_base_url", "/data/",
 		"-hls_segment_filename", "data/chunk-%Y%m%d-%H%M%S-stream-"+id+".ts",
 		"-f", "hls",
-		"-method", "PUT", "http://localhost:8080/stream/"+id+"/hls.m3u8",
-	)
+		"-method", "PUT", "http://localhost:8080/stream/"+id+"/"+strm.Profile.Name+"/hls.m3u8",
+	}...)
+
+	cmd := exec.Command("./ffmpeg", params...)
 
 	strm.Cmd = cmd
 
@@ -218,11 +232,17 @@ func (s *Server) createStream(id string) *Stream {
 	return strm
 }
 
-func (s *Server) getStream(id string) *Stream {
-	if val, ok := s.Streams[id]; ok && val.Active {
+func (s *Server) getStream(id string, profile string) *Stream {
+	sid := id+"/"+profile
+	if val, ok := s.Streams[sid]; ok && val.Active {
 		return val;
 	} else {
-		return s.createStream(id)
+		strm := s.createStream(id, profile)
+		strm.Id = sid
+		if strm != nil {
+			s.Streams[sid] = strm
+		}
+		return strm
 	}
 }
 
@@ -405,10 +425,25 @@ func dataCleanup(interval time.Duration, age time.Duration) {
 	}
 }
 
+func loadStreamProfiles() []*Profile {
+    raw, err := ioutil.ReadFile("./stream_profiles.json")
+    if err != nil {
+        log.Printf(err.Error())
+        os.Exit(1)
+    }
+
+    stream_profiles := make([]*Profile,0)
+    json.Unmarshal(raw, &stream_profiles)
+    log.Printf("SP: %+v", stream_profiles)
+    return stream_profiles
+}
+
 func main() {
 	router := gin.Default()
 	router.Use(SetHeaders)
 	router.LoadHTMLGlob("templates/*")
+
+	stream_profiles = loadStreamProfiles()
 
 	go dataCleanup(time.Hour, time.Hour*48)
 
@@ -425,10 +460,11 @@ func main() {
 	router.Static("/data", "./data")
 
 
-	stream := router.Group("/stream/:id", func(c *gin.Context) {
+	stream := router.Group("/stream/:id/:profile", func(c *gin.Context) {
 		id := c.Param("id")
+		profile := c.Param("profile")
 
-		strm := server.getStream(id)
+		strm := server.getStream(id, profile)
 		if strm == nil {
 			c.String(500, "Unable to start stream %s", id)
 			c.Abort()
@@ -477,9 +513,10 @@ func main() {
 
 	stream.GET("list.m3u", func(c *gin.Context) {
 		id := c.Param("id")
+		profile := c.Param("profile")
 		m3u := "#EXTM3U\n"
 		m3u = m3u + "#EXTINF:-1,TV\n"
-		m3u = m3u + "http://" + c.Request.Host + "/stream/" + id + "/stream.ts\n"
+		m3u = m3u + "http://" + c.Request.Host + "/stream/" + id + "/" + profile + "/stream.ts\n"
 		c.Data(200, "audio/mpegurl", []byte(m3u))
 	})
 
@@ -494,6 +531,10 @@ func main() {
 
 	router.GET("/sources", func(c *gin.Context) {
 		c.JSON(200, server.getSources())
+	})
+
+	router.GET("/profiles", func(c *gin.Context) {
+		c.JSON(200, stream_profiles)
 	})
 
 	router.POST("/sources", func(c *gin.Context) {
