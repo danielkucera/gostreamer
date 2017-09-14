@@ -11,7 +11,7 @@ RUN curl https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-64bit-static.tar.xz 
 RUN go-wrapper download
 RUN go-wrapper install
 
-VOLUME data
+VOLUME /go/src/app/data
 EXPOSE 8080
 
 CMD ["go-wrapper", "run"]
