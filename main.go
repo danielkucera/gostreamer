@@ -172,7 +172,7 @@ func (s *Server) createStream(id string, profile_name string) *Stream {
 		"-hls_base_url", "/data/",
 		"-hls_segment_filename", "data/chunk-%Y%m%d-%H%M%S-stream-"+id+".ts",
 		"-f", "hls",
-		"-method", "PUT", "http://localhost:8080/stream/"+id+"/"+strm.Profile.Name+"/hls.m3u8",
+		"-method", "PUT", "http://127.0.0.1:8080/stream/"+id+"/"+strm.Profile.Name+"/hls.m3u8",
 	}...)
 
 	cmd := exec.Command("./ffmpeg", params...)
