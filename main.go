@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-var db_file = "./db/db.sqlite"
+var db_file = "./data/db.sqlite"
 
 type Chunk struct {
 	Path	string
