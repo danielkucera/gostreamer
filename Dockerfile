@@ -1,10 +1,9 @@
-FROM golang:alpine
+FROM golang
 
 WORKDIR /go/src/app
 COPY . .
 
-RUN apk update && apk upgrade && \
-    apk add --no-cache bash git gcc libc-dev curl xz
+RUN apt-get update && apt-get install -y xz-utils
 
 RUN curl https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-64bit-static.tar.xz | tar -Jx && mv ffmpeg-git*/ffmpeg . && rm -rf ffmpeg-git*
 
