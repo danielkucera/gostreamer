@@ -1,5 +1,8 @@
 FROM golang:latest
 
+RUN echo 'Acquire::http::Proxy "http://webproxy.deutsche-boerse.de:8080/";' >> /etc/apt/apt.conf.d/proxy.conf
+RUN echo 'Acquire::https::Proxy "http://webproxy.deutsche-boerse.de:8080/";' >> /etc/apt/apt.conf.d/proxy.conf
+
 WORKDIR /go/src/app
 COPY . .
 
